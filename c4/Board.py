@@ -1,3 +1,16 @@
+class Colors:
+    red = '\033[91m'
+    yellow = '\033[93m'
+    default = '\033[0m'
+
+def add_color(text, color):
+    if color == -1:
+        return Colors.red + text + Colors.default
+    elif color == 1:
+        return Colors.yellow + text + Colors.default
+    else:
+        return text
+
 class Board:
     def __init__(self, width, height) -> None:
         self.width = width
@@ -11,12 +24,9 @@ class Board:
         if x < 0 or x >= self.width:
             raise IndexError
         i = self.height - 1
-        try:
-            while self.board[i][x] != 0:
-                i -= 1
-            self.board[i][x] = id
-        except IndexError:
-            pass
+        while self.board[i][x] != 0:
+            i -= 1
+        self.board[i][x] = id
         return i
     
     def check_win(self, x, y) -> bool:
@@ -40,3 +50,14 @@ class Board:
                     return 0
             except IndexError:
                 return 0
+    
+    def display(self):
+        for row in self.board:
+            print('|', end='')
+            for val in row:
+                if val == 0:
+                    print(' ', end='')
+                else:
+                    print(add_color('@', val), end='')
+                print('|', end='')
+            print()

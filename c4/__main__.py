@@ -1,15 +1,17 @@
+from .bots.BasicBot import BasicBot
 import os
 import pickle
 import sys
 from copy import deepcopy
 from random import choice, randrange
+from .Board import Board
 WEIGHT_MAX = 255
 
 
-class Colors:
-    red = '\033[91m'
-    yellow = '\033[93m'
-    default = '\033[0m'
+# class Colors:
+#     red = '\033[91m'
+#     yellow = '\033[93m'
+#     default = '\033[0m'
 
 
 class Bot:
@@ -176,25 +178,25 @@ def count_discs(x, y, v, h, state):
             return 0
 
 
-def add_color(text, color):
-    if color == 2:
-        return Colors.red + text + Colors.default
-    elif color == 1:
-        return Colors.yellow + text + Colors.default
-    else:
-        return text
+# def add_color(text, color):
+#     if color == 2:
+#         return Colors.red + text + Colors.default
+#     elif color == 1:
+#         return Colors.yellow + text + Colors.default
+#     else:
+#         return text
 
 
-def display(state):
-    for row in state:
-        print('|', end='')
-        for val in row:
-            if val == 0:
-                print(' ', end='')
-            else:
-                print(add_color('@', val), end='')
-            print('|', end='')
-        print()
+# def display(state):
+#     for row in state:
+#         print('|', end='')
+#         for val in row:
+#             if val == 0:
+#                 print(' ', end='')
+#             else:
+#                 print(add_color('@', val), end='')
+#             print('|', end='')
+#         print()
 
 
 def two_players(width, height):
@@ -225,100 +227,137 @@ def two_players(width, height):
             print('It\'s a draw!')
         input('Press Enter to play again.')
 
-
-def vs_random(width, height):
+def move_prompt(id, board: Board):
+    if id == 0:
+        desc = 'Your turn.'
+    elif id == 1:
+        desc = 'Player 1 turn.'
+    elif id == -1:
+        desc = 'Player 2 turn.'
     while True:
-        game = get_clear_board(width, height)
+        try:
+            os.system('cls')
+            board.display()
+            print(desc)
+            x = int(input()) - 1
+            y = board.drop_disc(id, x)
+            return x, y
+        except ValueError:
+            desc = 'Please enter a column index.'
+        except IndexError:
+            desc = 'You can\'t drop disc in that column.'
+
+def two_players(width, height):
+    while True:
+        board = Board(width, height)
         won = False
         turn = 0
-        while True:
-            desc = 'Your turn.'
-            while True:
-                try:
-                    os.system('cls')
-                    display(game)
-                    print(desc)
-                    col = int(input()) - 1
-                    won = drop_disc(1, col, game, width, height)
-                    break
-                except ValueError:
-                    desc = 'Please enter a column index.'
-                except IndexError:
-                    desc = 'You can\'t drop disc in that column.'
+        id = 1
+        while not won and turn < width * height:
+            x, y = move_prompt(id, board)
+            won = board.check_win(x, y)
             turn += 1
-            if won or turn >= width * height:
-                break
-            won = drop_disc(2, choice(get_av_moves(game)), game, width, height)
-            turn += 1
-            if won or turn >= width * height:
-                break
+            id = -id
         os.system('cls')
-        display(game)
+        board.display()
         if won:
-            if turn & 1:
-                print('You win!')
-            else:
-                print('You lose!')
+            print('Player', (turn - 1 & 1) + 1, 'wins!')
         else:
             print('It\'s a draw!')
         input('Press Enter to play again.')
 
 
-def vs_bot(width, height, filename=''):
-    try:
-        if filename:
-            with open(filename, 'rb') as file_in:
-                Bot.memory = pickle.load(file_in)
-    except FileNotFoundError:
-        pass
-    try:
-        bot = Bot()
-        while True:
-            game = get_clear_board(width, height)
-            won = False
-            turn = 0
-            while True:
-                desc = 'Your turn.'
-                while True:
-                    try:
-                        os.system('cls')
-                        display(game)
-                        print(desc)
-                        col = int(input()) - 1
-                        won = drop_disc(1, col, game, width, height)
-                        break
-                    except ValueError:
-                        desc = 'Please enter a column index.'
-                    except IndexError:
-                        desc = 'You can\'t drop disc in that column.'
-                turn += 1
-                if won or turn >= width * height:
-                    break
-                won = drop_disc(2, bot.make_move(game), game, width, height)
-                turn += 1
-                if won or turn >= width * height:
-                    break
-            os.system('cls')
-            display(game)
-            if won:
-                if turn & 1:
-                    print('You win!')
-                    bot.lose()
-                else:
-                    print('You lose!')
-                    bot.win()
+def vs_bot(width, height, bot: BasicBot):
+    while True:
+        board = Board(width, height)
+        won = False
+        turn = 0
+        id = 1
+        while not won and turn < width * height:
+
+            x, y = move_prompt(id, board)
+            won = board.check_win(x, y)
+            turn += 1
+            id = -id
+            if won or turn >= width * height:
+                break
+
+            x = bot.make_move(board)
+            y = board.drop_disc(id, x)
+            won = board.check_win(x, y)
+            turn += 1
+            id = -id
+
+        os.system('cls')
+        board.display()
+        if won:
+            if id != 1:
+                print('You win!')
+                bot.lose()
             else:
-                print('It\'s a draw!')
-                bot.draw()
-            input('Press Enter to play again.')
-    except KeyboardInterrupt:
-        if filename:
-            with open(filename, 'wb') as file_out:
-                pickle.dump(Bot.memory, file_out)
-        raise KeyboardInterrupt
+                print('You lose.')
+                bot.win()
+        else:
+            print('It\'s a draw!')
+            bot.draw()
+        input('Press Enter to play again.')
 
 
-def learn(width, height, filename=''):
+# def vs_bot(width, height, filename=''):
+#     try:
+#         if filename:
+#             with open(filename, 'rb') as file_in:
+#                 Bot.memory = pickle.load(file_in)
+#     except FileNotFoundError:
+#         pass
+#     try:
+#         bot = Bot()
+#         while True:
+#             game = get_clear_board(width, height)
+#             won = False
+#             turn = 0
+#             while True:
+#                 desc = 'Your turn.'
+#                 while True:
+#                     try:
+#                         os.system('cls')
+#                         display(game)
+#                         print(desc)
+#                         col = int(input()) - 1
+#                         won = drop_disc(1, col, game, width, height)
+#                         break
+#                     except ValueError:
+#                         desc = 'Please enter a column index.'
+#                     except IndexError:
+#                         desc = 'You can\'t drop disc in that column.'
+#                 turn += 1
+#                 if won or turn >= width * height:
+#                     break
+#                 won = drop_disc(2, bot.make_move(game), game, width, height)
+#                 turn += 1
+#                 if won or turn >= width * height:
+#                     break
+#             os.system('cls')
+#             display(game)
+#             if won:
+#                 if turn & 1:
+#                     print('You win!')
+#                     bot.lose()
+#                 else:
+#                     print('You lose!')
+#                     bot.win()
+#             else:
+#                 print('It\'s a draw!')
+#                 bot.draw()
+#             input('Press Enter to play again.')
+#     except KeyboardInterrupt:
+#         if filename:
+#             with open(filename, 'wb') as file_out:
+#                 pickle.dump(Bot.memory, file_out)
+#         raise KeyboardInterrupt
+
+
+def train(width, height, filename=''):
     if filename:
         try:
             with open(filename, 'rb') as file_in:
@@ -365,7 +404,7 @@ def main(argv):
     try:
         flag_bot = False
         flag_random = False
-        flag_learn = False
+        flag_train = False
         filename = ''
         width = 7
         height = 6
@@ -375,16 +414,16 @@ def main(argv):
                 filename = argv[i+1]
             elif argv[i] == '-r':
                 flag_random = True
-            elif argv[i] == '-l':
-                flag_learn = True
+            elif argv[i] == '-t':
+                flag_train = True
                 filename = argv[i+1]
         os.system('color')
         if flag_bot:
             vs_bot(width, height, filename)
         elif flag_random:
-            vs_random(width, height)
-        elif flag_learn:
-            learn(width, height, filename)
+            vs_bot(width, height, BasicBot())
+        elif flag_train:
+            train(width, height, filename)
         else:
             two_players(width, height)
 
