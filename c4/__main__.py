@@ -227,13 +227,11 @@ def two_players(width, height):
             print('It\'s a draw!')
         input('Press Enter to play again.')
 
-def move_prompt(id, board: Board):
-    if id == 0:
+def move_prompt(id, player, board: Board):
+    if player == 0:
         desc = 'Your turn.'
-    elif id == 1:
-        desc = 'Player 1 turn.'
-    elif id == -1:
-        desc = 'Player 2 turn.'
+    else:
+        desc = 'Player ' + str(player) + ' turn.'
     while True:
         try:
             os.system('cls')
@@ -254,14 +252,14 @@ def two_players(width, height):
         turn = 0
         id = 1
         while not won and turn < width * height:
-            x, y = move_prompt(id, board)
+            x, y = move_prompt(id, id, board)
             won = board.check_win(x, y)
             turn += 1
-            id = -id
+            id = 3 - id
         os.system('cls')
         board.display()
         if won:
-            print('Player', (turn - 1 & 1) + 1, 'wins!')
+            print('Player', 3 - id, 'wins!')
         else:
             print('It\'s a draw!')
         input('Press Enter to play again.')
@@ -275,10 +273,10 @@ def vs_bot(width, height, bot: BasicBot):
         id = 1
         while not won and turn < width * height:
 
-            x, y = move_prompt(id, board)
+            x, y = move_prompt(id, 0, board)
             won = board.check_win(x, y)
             turn += 1
-            id = -id
+            id = 3 - id
             if won or turn >= width * height:
                 break
 
@@ -286,7 +284,7 @@ def vs_bot(width, height, bot: BasicBot):
             y = board.drop_disc(id, x)
             won = board.check_win(x, y)
             turn += 1
-            id = -id
+            id = 3 - id
 
         os.system('cls')
         board.display()
