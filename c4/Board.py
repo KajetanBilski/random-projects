@@ -29,15 +29,12 @@ class Board:
         for x in range(self.width):
             colval = val % (2 ** (self.height + 1))
             val //= 2 ** (self.height + 1)
-            if colval == 0:
-                colheight = 0
-            else:
-                colheight = math.ceil(math.log2(colval))
+            colheight = math.floor(math.log2(colval + 1))
             for y in range(self.height):
                 if y < self.height - colheight:
                     board[y].insert(0, 0)
                 else:
-                    board[y].insert(0, 1 + (((colval - 1) & (2 ** (self.height - 1 - y)) > 0)))
+                    board[y].insert(0, 1 + ((colval - 1) & (2 ** (self.height - 1 - y)) > 0))
         return board
 
     def available_moves(self) -> list:
