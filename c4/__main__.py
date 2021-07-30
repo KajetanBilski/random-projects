@@ -1,3 +1,4 @@
+from .bots.NeuralBot import NeuralBot
 from .bots.BasicBot import BasicBot
 import os
 import pickle
@@ -363,7 +364,7 @@ def train(width, height, filename=''):
         except FileNotFoundError:
             pass
     games_played = 0
-    print('Learning...')
+    print('Training...')
     try:
         bot1 = Bot()
         bot2 = Bot()
@@ -409,7 +410,7 @@ def main(argv):
         for i in range(len(argv)):
             if argv[i] == '-b':
                 flag_bot = True
-                filename = argv[i+1]
+                # filename = argv[i+1]
             elif argv[i] == '-r':
                 flag_random = True
             elif argv[i] == '-t':
@@ -417,7 +418,7 @@ def main(argv):
                 filename = argv[i+1]
         os.system('color')
         if flag_bot:
-            vs_bot(width, height, filename)
+            vs_bot(width, height, NeuralBot(width, height))
         elif flag_random:
             vs_bot(width, height, BasicBot())
         elif flag_train:

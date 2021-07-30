@@ -1,6 +1,10 @@
 import math
 from typing import List
 
+import torch
+from torch._C import dtype
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Colors:
     red = '\033[91m'
@@ -86,6 +90,14 @@ class Board:
                     break
             val += xval
         return val
+
+    def to_tensor(self, pov) -> torch.Tensor:
+        t = torch.tensor(self.board, dtype=torch.int64, device=device)
+        t = torch.nn.functional.one_hot(t, num_classes=3)
+        t = torch.index_select(t, 2, torch.tensor([1, 2], device=device))
+        if pov == 2:
+            t = torch.flip(t, [2])
+        return t.float()
     
     def display(self):
         for row in self.board:
