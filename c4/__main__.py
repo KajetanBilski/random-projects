@@ -344,6 +344,43 @@ def train(width, height, filename=''):
                 pickle.dump(Bot.memory, file_out)
         raise KeyboardInterrupt
 
+def train(width, height, bot1, bot2):
+    games_played = 0
+    print('Training...')
+    try:
+        while True:
+            board = Board(width, height)
+            won = False
+            turn = 0
+            while not won and turn < width * height:
+
+                x = bot1.make_move(board)
+                y = board.drop_disc(id, x)
+                won = board.check_win(x, y)
+                turn += 1
+                if won or turn >= width * height:
+                    break
+
+                x = bot2.make_move(board)
+                y = board.drop_disc(id, x)
+                won = board.check_win(x, y)
+                turn += 1
+
+            if won:
+                if id != 1:
+                    bot1.win()
+                    bot2.lose()
+                else:
+                    bot1.lose()
+                    bot2.win()
+            else:
+                bot1.draw()
+                bot2.draw()
+            games_played += 1
+    except KeyboardInterrupt:
+        print(games_played, 'games played.')
+        raise KeyboardInterrupt()
+
 def get_args(argv):
     argc = len(argv)
     args = {
@@ -388,7 +425,7 @@ def main(argv):
         os.system('color')
         if args['train']:
             if args['opponent'] == 'NeuralBot':
-                train(args['width'], args['height'], args['filename'])
+                train(args['width'], args['height'], args['filename'], NeuralBot(1, args['width'], args['height'], args['filename']), NeuralBot(2))
         else:
             if args['opponent'] == 'NeuralBot':
                 vs_bot(args['width'], args['height'], NeuralBot(2, args['width'], args['height'], args['filename']))

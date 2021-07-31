@@ -7,18 +7,27 @@ from torch import nn
 import torch
 import os
 
+MEMORY_CAPACITY = 10000
+BATCH_SIZE = 128
+GAMMA = 0.999
+EPS_START = 0.9
+EPS_END = 0.05
+EPS_DECAY = 200
+TARGET_UPDATE = 10
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 engine = None
 
 class NeuralBot(BasicBot):
 
-    def __init__(self, id, width=7, height=6, filename=''):
-        global engine
+    def __init__(self, id):
         super().__init__()
         self.id = id
-        if not engine:
-            engine = NeuralEngine(width, height, filename)
         self.reset()
+
+    @staticmethod
+    def init_engine(width=7, height=6, filename='', eps=False):
+        engine = NeuralEngine(width, height, filename, eps)
     
     def make_move(self, board: Board):
         state = board.to_tensor(self.id)
@@ -94,10 +103,10 @@ class ReplayMemory(object):
 
 class NeuralEngine:
 
-    def __init__(self, width, height, filename) -> None:
+    def __init__(self, width, height, filename, eps) -> None:
         
         self.filename = filename
-        self.eps = 0.
+        self.eps = EPS_START
 
         self.policy_net = DQN(width, height).to(device)
         if filename and os.path.exists(filename):
@@ -108,6 +117,8 @@ class NeuralEngine:
         self.target_net.eval()
         self.optimizer = torch.optim.RMSprop(self.policy_net.parameters())
         self.criterion = nn.SmoothL1Loss()
+
+        self.memory = ReplayMemory()
     
     def add_memory(self, state, action, next_state, reward):
         pass
@@ -116,3 +127,4 @@ class NeuralEngine:
         if self.filename:
             with open(self.filename, 'wb') as f:
                 pickle.dump(self.target_net.state_dict(), f)
+        print('Saved.')
