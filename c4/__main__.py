@@ -302,60 +302,6 @@ def vs_bot(width, height, bot: BasicBot):
         input('Press Enter to play again.')
 
 
-# def vs_bot(width, height, filename=''):
-#     try:
-#         if filename:
-#             with open(filename, 'rb') as file_in:
-#                 Bot.memory = pickle.load(file_in)
-#     except FileNotFoundError:
-#         pass
-#     try:
-#         bot = Bot()
-#         while True:
-#             game = get_clear_board(width, height)
-#             won = False
-#             turn = 0
-#             while True:
-#                 desc = 'Your turn.'
-#                 while True:
-#                     try:
-#                         os.system('cls')
-#                         display(game)
-#                         print(desc)
-#                         col = int(input()) - 1
-#                         won = drop_disc(1, col, game, width, height)
-#                         break
-#                     except ValueError:
-#                         desc = 'Please enter a column index.'
-#                     except IndexError:
-#                         desc = 'You can\'t drop disc in that column.'
-#                 turn += 1
-#                 if won or turn >= width * height:
-#                     break
-#                 won = drop_disc(2, bot.make_move(game), game, width, height)
-#                 turn += 1
-#                 if won or turn >= width * height:
-#                     break
-#             os.system('cls')
-#             display(game)
-#             if won:
-#                 if turn & 1:
-#                     print('You win!')
-#                     bot.lose()
-#                 else:
-#                     print('You lose!')
-#                     bot.win()
-#             else:
-#                 print('It\'s a draw!')
-#                 bot.draw()
-#             input('Press Enter to play again.')
-#     except KeyboardInterrupt:
-#         if filename:
-#             with open(filename, 'wb') as file_out:
-#                 pickle.dump(Bot.memory, file_out)
-#         raise KeyboardInterrupt
-
-
 def train(width, height, filename=''):
     if filename:
         try:
@@ -398,33 +344,58 @@ def train(width, height, filename=''):
                 pickle.dump(Bot.memory, file_out)
         raise KeyboardInterrupt
 
+def get_args(argv):
+    argc = len(argv)
+    args = {
+        'width': 7,
+        'height': 6,
+        'opponent': None,
+        'filename': '',
+        'train': False
+    }
+    i = 0
+    while i < argc:
+        if argv[i] == '-r' or argv[i] == '--random':
+            if args['opponent']:
+                raise RuntimeError
+            else:
+                args['opponent'] = 'BasicBot'
+        elif argv[i] == '-b' or argv[i] == '--bot':
+            if args['opponent']:
+                raise RuntimeError
+            else:
+                args['opponent'] = 'NeuralBot'
+                i += 1
+                if i < argc:
+                    args['filename'] = argv[i]
+        elif argv[i] == '-t' or argv[i] == '-train':
+            if args['opponent']:
+                raise RuntimeError
+            else:
+                args['opponent'] = 'NeuralBot'
+                args['train'] = True
+                i += 1
+                if i < argc:
+                    args['filename'] = argv[i]
+        i += 1
+    if not args['opponent']:
+        args['opponent'] = 'player'
+    return args
 
 def main(argv):
     try:
-        flag_bot = False
-        flag_random = False
-        flag_train = False
-        filename = ''
-        width = 7
-        height = 6
-        for i in range(len(argv)):
-            if argv[i] == '-b':
-                flag_bot = True
-                # filename = argv[i+1]
-            elif argv[i] == '-r':
-                flag_random = True
-            elif argv[i] == '-t':
-                flag_train = True
-                filename = argv[i+1]
+        args = get_args(argv)
         os.system('color')
-        if flag_bot:
-            vs_bot(width, height, NeuralBot(width, height))
-        elif flag_random:
-            vs_bot(width, height, BasicBot())
-        elif flag_train:
-            train(width, height, filename)
+        if args['train']:
+            if args['opponent'] == 'NeuralBot':
+                train(args['width'], args['height'], args['filename'])
         else:
-            two_players(width, height)
+            if args['opponent'] == 'NeuralBot':
+                vs_bot(args['width'], args['height'], NeuralBot(2, args['width'], args['height'], args['filename']))
+            elif args['opponent'] == 'BasicBot':
+                vs_bot(args['width'], args['height'], BasicBot())
+            elif args['opponent'] == 'player':
+                two_players(args['width'], args['height'])
 
     except KeyboardInterrupt:
         print('Exiting...')

@@ -5,36 +5,54 @@ from ..Board import Board
 from .BasicBot import BasicBot
 from torch import nn
 import torch
+import os
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 engine = None
 
 class NeuralBot(BasicBot):
 
-    def __init__(self, id):
+    def __init__(self, id, width=7, height=6, filename=''):
+        global engine
         super().__init__()
         self.id = id
+        if not engine:
+            engine = NeuralEngine(width, height, filename)
+        self.reset()
     
     def make_move(self, board: Board):
-        if random.random() > self.eps:
-            vals = policy_net(torch.unsqueeze(board.to_tensor(self.id), 0))
+        state = board.to_tensor(self.id)
+        if random.random() > engine.eps:
+            vals = engine.policy_net(torch.unsqueeze(state, 0))
             _, indices = vals.squeeze().sort()
             i = 0
             av_moves = board.available_moves()
             while indices[i] not in av_moves:
                 i += 1
-            return indices[i]
+            move = indices[i]
         else:
-            return super().make_move(board)
+            move = super().make_move(board)
+        engine.add_memory(self.last_state, self.last_action, state, 0.)
+        return move
 
     def win(self):
+        engine.add_memory(self.last_state, self.last_action, None, 1.)
+        self.reset()
         return super().win()
     
     def lose(self):
+        engine.add_memory(self.last_state, self.last_action, None, -1.)
+        self.reset()
         return super().lose()
     
     def draw(self):
+        engine.add_memory(self.last_state, self.last_action, None, 0.)
+        self.reset()
         return super().draw()
+    
+    def reset(self):
+        self.last_state = None
+        self.last_action = None
 
 
 class DQN(nn.Module):
@@ -77,8 +95,12 @@ class ReplayMemory(object):
 class NeuralEngine:
 
     def __init__(self, width, height, filename) -> None:
+        
+        self.filename = filename
+        self.eps = 0.
+
         self.policy_net = DQN(width, height).to(device)
-        if filename:
+        if filename and os.path.exists(filename):
             with open(filename, "rb") as f:
                 self.policy_net.load_state_dict(pickle.load(f))
         self.target_net = DQN(width, height).to(device)
@@ -86,3 +108,11 @@ class NeuralEngine:
         self.target_net.eval()
         self.optimizer = torch.optim.RMSprop(self.policy_net.parameters())
         self.criterion = nn.SmoothL1Loss()
+    
+    def add_memory(self, state, action, next_state, reward):
+        pass
+
+    def save(self):
+        if self.filename:
+            with open(self.filename, 'wb') as f:
+                pickle.dump(self.target_net.state_dict(), f)
