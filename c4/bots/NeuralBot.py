@@ -7,6 +7,7 @@ from torch import nn
 import torch
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+engine = None
 
 class NeuralBot(BasicBot):
 
@@ -73,23 +74,15 @@ class ReplayMemory(object):
     def __len__(self):
         return len(self.memory)
 
+class NeuralEngine:
 
-policy_net = None
-target_net = None
-criterion = None
-optimizer = None
-prev_states = None
-
-def init_net(width=7, height=6, filename=None):
-    policy_net = DQN(width, height).to(device)
-    if filename:
-        with open(filename, "rb") as f:
-            policy_net.load_state_dict(pickle.load(f))
-    target_net = DQN(width, height).to(device)
-    target_net.load_state_dict(policy_net.state_dict())
-    target_net.eval()
-    optimizer = torch.optim.RMSprop(policy_net.parameters())
-    criterion = nn.SmoothL1Loss()
-
-def reset_game():
-    prev_states = deque([], maxlen=2)
+    def __init__(self, width, height, filename) -> None:
+        self.policy_net = DQN(width, height).to(device)
+        if filename:
+            with open(filename, "rb") as f:
+                self.policy_net.load_state_dict(pickle.load(f))
+        self.target_net = DQN(width, height).to(device)
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+        self.target_net.eval()
+        self.optimizer = torch.optim.RMSprop(self.policy_net.parameters())
+        self.criterion = nn.SmoothL1Loss()
