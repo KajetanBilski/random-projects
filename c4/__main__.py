@@ -199,35 +199,6 @@ def count_discs(x, y, v, h, state):
 #             print('|', end='')
 #         print()
 
-
-def two_players(width, height):
-    while True:
-        game = get_clear_board(width, height)
-        won = False
-        turn = 0
-        while not won and turn < width * height:
-            desc = 'Player ' + str((turn & 1) + 1) + '\'s turn.'
-            while True:
-                try:
-                    os.system('cls')
-                    display(game)
-                    print(desc)
-                    col = int(input()) - 1
-                    won = drop_disc((turn & 1) + 1, col, game, width, height)
-                    break
-                except ValueError:
-                    desc = 'Please enter a column index.'
-                except IndexError:
-                    desc = 'You can\'t drop disc in that column.'
-            turn += 1
-        os.system('cls')
-        display(game)
-        if won:
-            print('Player', (turn - 1 & 1) + 1, 'wins!')
-        else:
-            print('It\'s a draw!')
-        input('Press Enter to play again.')
-
 def move_prompt(id, player, board: Board):
     if player == 0:
         desc = 'Your turn.'
@@ -301,49 +272,6 @@ def vs_bot(width, height, bot: BasicBot):
             bot.draw()
         input('Press Enter to play again.')
 
-
-def train(width, height, filename=''):
-    if filename:
-        try:
-            with open(filename, 'rb') as file_in:
-                Bot.memory = pickle.load(file_in)
-        except FileNotFoundError:
-            pass
-    games_played = 0
-    print('Training...')
-    try:
-        bot1 = Bot()
-        bot2 = Bot()
-        while True:
-            game = get_clear_board(width, height)
-            turn = 0
-            while True:
-                won = drop_disc(1, bot1.make_move(game), game, width, height)
-                turn += 1
-                if won or turn >= width * height:
-                    break
-                won = drop_disc(2, bot2.make_move(game), game, width, height)
-                turn += 1
-                if won or turn >= width * height:
-                    break
-            if won:
-                if turn & 1:
-                    bot1.win()
-                    bot2.lose()
-                else:
-                    bot2.win()
-                    bot1.lose()
-            else:
-                bot1.draw()
-                bot2.draw()
-            games_played += 1
-    except KeyboardInterrupt:
-        print("Games played:", games_played)
-        if filename:
-            with open(filename, 'wb') as file_out:
-                pickle.dump(Bot.memory, file_out)
-        raise KeyboardInterrupt
-
 def train(width, height, bot1, bot2):
     games_played = 0
     print('Training...')
@@ -355,19 +283,19 @@ def train(width, height, bot1, bot2):
             while not won and turn < width * height:
 
                 x = bot1.make_move(board)
-                y = board.drop_disc(id, x)
+                y = board.drop_disc(1, x)
                 won = board.check_win(x, y)
                 turn += 1
                 if won or turn >= width * height:
                     break
 
                 x = bot2.make_move(board)
-                y = board.drop_disc(id, x)
+                y = board.drop_disc(2, x)
                 won = board.check_win(x, y)
                 turn += 1
 
             if won:
-                if id != 1:
+                if turn % 2:
                     bot1.win()
                     bot2.lose()
                 else:
@@ -376,6 +304,7 @@ def train(width, height, bot1, bot2):
             else:
                 bot1.draw()
                 bot2.draw()
+            NeuralBot.update_target()
             games_played += 1
     except KeyboardInterrupt:
         print(games_played, 'games played.')
@@ -425,16 +354,19 @@ def main(argv):
         os.system('color')
         if args['train']:
             if args['opponent'] == 'NeuralBot':
-                train(args['width'], args['height'], args['filename'], NeuralBot(1, args['width'], args['height'], args['filename']), NeuralBot(2))
+                NeuralBot.init_engine(args['width'], args['height'], args['filename'], True)
+                train(args['width'], args['height'], NeuralBot(1), NeuralBot(2))
         else:
             if args['opponent'] == 'NeuralBot':
-                vs_bot(args['width'], args['height'], NeuralBot(2, args['width'], args['height'], args['filename']))
+                NeuralBot.init_engine(args['width'], args['height'], args['filename'], False)
+                vs_bot(args['width'], args['height'], NeuralBot(2))
             elif args['opponent'] == 'BasicBot':
                 vs_bot(args['width'], args['height'], BasicBot())
             elif args['opponent'] == 'player':
                 two_players(args['width'], args['height'])
 
     except KeyboardInterrupt:
+        NeuralBot.save()
         print('Exiting...')
         exit(0)
 
