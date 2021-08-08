@@ -10,8 +10,8 @@ import torch
 import os
 
 MEMORY_CAPACITY = 10000
-BATCH_SIZE = 128
-GAMMA = 0.9
+BATCH_SIZE = 512
+GAMMA = 0.5
 EPS_START = 0.9
 EPS_END = 0.05
 EPS_DECAY = 200
@@ -42,21 +42,21 @@ class NeuralBot(BasicBot):
         engine.next_episode()
     
     def make_move(self, board: Board):
-        state = board.to_tensor(self.id)
+        state = board.to_tensor(self.id).unsqueeze(0)
         if random.random() > engine.eps:
-            vals = engine.policy_net(torch.unsqueeze(state, 0))
+            vals = engine.policy_net(state)
             _, indices = vals.squeeze().sort()
             i = 0
             av_moves = board.available_moves()
             while indices[i] not in av_moves:
-                engine.push_memory(state.unsqueeze(0), indices[i].unsqueeze(0), None, torch.tensor([-1], device=device))
+                engine.push_memory(state, indices[i].unsqueeze(0), None, torch.tensor([-1], device=device))
                 i += 1
             action = indices[i]
         else:
             action = torch.tensor(super().make_move(board), device=device)
         if self.last_state is not None:
-            engine.push_memory(self.last_state, self.last_action, state.unsqueeze(0), torch.tensor([0], device=device))
-        self.last_state = state.unsqueeze(0)
+            engine.push_memory(self.last_state, self.last_action, state, torch.tensor([0], device=device))
+        self.last_state = state
         self.last_action = action.unsqueeze(0)
         return action
 
@@ -90,22 +90,26 @@ class DQN(nn.Module):
             raise NotImplementedError()
         super().__init__()
         self.layers = nn.Sequential(
+            nn.Conv2d(2, 8, kernel_size=2),
+            nn.PReLU(),
+            nn.Conv2d(8, 32, kernel_size=2),
+            nn.PReLU(),
+            nn.Conv2d(32, 128, kernel_size=2),
+            nn.PReLU(),
             nn.Flatten(),
-            nn.Linear(84, 128),
-            nn.ReLU(),
-            nn.Linear(128, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.Linear(32, 7)
+            nn.Linear(12 * 128, 1024),
+            nn.PReLU(),
+            nn.Linear(1024, 512),
+            nn.PReLU(),
+            nn.Linear(512, 256),
+            nn.PReLU(),
+            nn.Linear(256, 64),
+            nn.PReLU(),
+            nn.Linear(64, 7)
         )
 
     def forward(self, x: torch.Tensor):
-        return self.layers(x)
+        return self.layers(x.view(x.shape[0], 2, 6, 7))
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
