@@ -10,43 +10,11 @@ from tqdm import tqdm
 from champfer_loss import ChamferLoss
 import random
 import matplotlib.pyplot as plt
+from models import MyAutoEncoder, MyVAutoEncoder
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 CLOUD_SIZE = 1024
 BATCH_SIZE = 128
-
-class MyAutoEncoder(nn.Module):
-
-    def __init__(self, cloud_size):
-        super().__init__()
-        self.cloud_size = cloud_size
-        self.encoder = torch.nn.Sequential(
-            nn.Conv1d(3, 64, 1),
-            nn.BatchNorm1d(64),
-            nn.ReLU(),
-            nn.Conv1d(64, 128, 1),
-            nn.BatchNorm1d(128),
-            nn.ReLU(),
-            nn.Conv1d(128, 128, 1),
-            nn.BatchNorm1d(128)
-        )
-        self.decoder = nn.Sequential(
-            nn.Linear(128, 256),
-            nn.ReLU(),
-            nn.Linear(256, 256),
-            nn.ReLU(),
-            nn.Linear(256, self.cloud_size * 3)
-        )
-    
-    def encode(self, x):
-        x = x.permute(0, 2, 1)
-        return torch.max(self.encoder(x), 2)[0]
-    
-    def decode(self, x):
-        return self.decoder(x).view(-1, self.cloud_size, 3)
-
-    def forward(self, x):
-        return self.decode(self.encode(x))
 
 def load_data(type, folder = ''):
     path1 = './' + type + '_data/'
@@ -164,7 +132,7 @@ def plotPCbatch(pcArray1, pcArray2, show = True, save = False, name=None, fig_co
         return fig
 
 def test(folder, filename):
-    model = MyAutoEncoder(CLOUD_SIZE).to(device)
+    model = MyVAutoEncoder(CLOUD_SIZE).to(device)
     with open(filename, 'rb') as f:
         model.load_state_dict(pickle.load(f))
     test_data = load_data('test', folder)
@@ -175,6 +143,8 @@ def test(folder, filename):
         pred_batch = model(batch[0].to(device))
         plotPCbatch(batch[0].detach(), pred_batch.cpu().detach())
         break
+
+    exit(0)
 
 def main(argv):
     folder = '04379243'
@@ -194,7 +164,7 @@ def main(argv):
 
     print('Validation data loaded.')
 
-    model = MyAutoEncoder(CLOUD_SIZE).to(device)
+    model = MyVAutoEncoder(CLOUD_SIZE).to(device)
     loss_fn = ChamferLoss()
     optimizer = torch.optim.Adam(model.parameters())
 
