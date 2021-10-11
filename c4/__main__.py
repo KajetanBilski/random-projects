@@ -142,7 +142,7 @@ def get_args(argv):
                 i += 1
                 if i < argc:
                     args['filename'] = argv[i]
-        elif argv[i] == '-t' or argv[i] == '-train':
+        elif argv[i] == '-t' or argv[i] == '--train':
             if args['opponent']:
                 raise RuntimeError
             else:

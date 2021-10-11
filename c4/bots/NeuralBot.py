@@ -185,9 +185,9 @@ class NeuralEngine:
 
         loss = self.criterion(state_action_values, expected_state_action_values.unsqueeze(1))
 
-        self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+        self.optimizer.zero_grad()
 
     def save(self):
         if self.filename:
