@@ -1,4 +1,12 @@
 import sys
+import copy
+import numpy as np
+import torch
+from torch import nn
+import gym
+from gym.spaces import Box
+from gym.wrappers import FrameStack
+from torchvision import transforms as T
 from nes_py.wrappers import JoypadSpace
 import gym_super_mario_bros
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
@@ -60,10 +68,64 @@ class ResizeObservation(gym.ObservationWrapper):
         return observation
 
 
-class Mario():
-
-    def __init__(self) -> None:
+class Mario:
+    def __init__():
         pass
+
+    def act(self, state):
+        """Given a state, choose an epsilon-greedy action"""
+        pass
+
+    def cache(self, experience):
+        """Add the experience to memory"""
+        pass
+
+    def recall(self):
+        """Sample experiences from memory"""
+        pass
+
+    def learn(self):
+        """Update online action value (Q) function with a batch of experiences"""
+        pass
+
+class MarioNet(nn.Module):
+    """mini cnn structure
+  input -> (conv2d + relu) x 3 -> flatten -> (dense + relu) x 2 -> output
+  """
+
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        c, h, w = input_dim
+
+        if h != 84:
+            raise ValueError(f"Expecting input height: 84, got: {h}")
+        if w != 84:
+            raise ValueError(f"Expecting input width: 84, got: {w}")
+
+        self.online = nn.Sequential(
+            nn.Conv2d(in_channels=c, out_channels=32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(3136, 512),
+            nn.ReLU(),
+            nn.Linear(512, output_dim),
+        )
+
+        self.target = copy.deepcopy(self.online)
+
+        # Q_target parameters are frozen.
+        for p in self.target.parameters():
+            p.requires_grad = False
+
+    def forward(self, input, model):
+        if model == "online":
+            return self.online(input)
+        elif model == "target":
+            return self.target(input)
 
 def main(argv):
     env = gym_super_mario_bros.make('SuperMarioBros-v0')
