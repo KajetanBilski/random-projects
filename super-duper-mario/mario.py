@@ -8,6 +8,7 @@ from torch.utils.data.dataset import IterableDataset
 from torchvision import transforms as T
 import numpy as np
 from pytorch_lightning import LightningModule, Trainer
+from pytorch_lightning.loggers import CSVLogger
 
 import gym
 from gym.spaces import Box
@@ -16,6 +17,7 @@ from gym.wrappers import FrameStack
 from nes_py.wrappers import JoypadSpace
 
 import gym_super_mario_bros
+from gym_super_mario_bros.actions import COMPLEX_MOVEMENT
 
 
 class SkipFrame(gym.Wrapper):
@@ -68,31 +70,38 @@ class ResizeObservation(gym.ObservationWrapper):
 
     def observation(self, observation):
         transforms = T.Compose(
-            [T.Resize(self.shape), T.Normalize(0, 255)]
+            [T.Resize(self.shape, antialias=True), T.Normalize(0, 255)]
         )
         observation = transforms(observation).squeeze(0)
         return observation
 
 
-class DQN(nn.Module):
-    """Simple MLP network."""
-
-    def __init__(self, obs_size: int, n_actions: int, hidden_size: int = 128):
-        """
-        Args:
-            obs_size: observation/state size of the environment
-            n_actions: number of discrete actions available in the environment
-            hidden_size: size of hidden layers
-        """
+class MarioNet(nn.Module):
+    def __init__(self, input_dim: Tuple[int], output_dim: int) -> None:
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, n_actions),
-        )
 
+        c, h, w = input_dim
+
+        if h != 84:
+            raise ValueError(f"Expecting input height: 84, got: {h}")
+        if w != 84:
+            raise ValueError(f"Expecting input width: 84, got: {w}")
+
+        self.net = nn.Sequential(
+            nn.Conv2d(in_channels=c, out_channels=32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(3136, 512),
+            nn.ReLU(),
+            nn.Linear(512, output_dim),
+        )
+    
     def forward(self, x):
-        return self.net(x.float())
+        return self.net(x)
 
 
 Experience = namedtuple(
@@ -185,7 +194,7 @@ class Agent:
         if np.random.random() < epsilon:
             action = self.env.action_space.sample()
         else:
-            state = torch.tensor([self.state])
+            state = torch.tensor(self.state.__array__()).unsqueeze(0)
 
             if device not in ["cpu"]:
                 state = state.cuda(device)
@@ -230,6 +239,18 @@ class Agent:
         return reward, done
 
 
+def create_enviroment(id: str = "SuperMarioBros-1-1-v0", render_mode: str = None):
+    env = gym_super_mario_bros.make(id, render_mode=render_mode, apply_api_compatibility=True)
+
+    env = JoypadSpace(env, COMPLEX_MOVEMENT)
+    env = SkipFrame(env, skip=4)
+    env = GrayScaleObservation(env)
+    env = ResizeObservation(env, shape=84)
+    env = FrameStack(env, num_stack=4)
+
+    return env
+
+
 class DQNLightning(LightningModule):
     """Basic DQN Model."""
 
@@ -237,8 +258,9 @@ class DQNLightning(LightningModule):
         self,
         batch_size: int = 16,
         lr: float = 1e-2,
-        env: str = "CartPole-v0",
-        gamma: float = 0.99,
+        env: str = "SuperMarioBros-1-1-v0",
+        render_mode: str = None,
+        gamma: float = 0.9,
         sync_rate: int = 10,
         replay_size: int = 1000,
         warm_start_size: int = 1000,
@@ -266,12 +288,13 @@ class DQNLightning(LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
-        self.env = gym.make(self.hparams.env)
-        obs_size = self.env.observation_space.shape[0]
+        self.env = create_enviroment(self.hparams.env, self.hparams.render_mode)
+
+        obs_size = self.env.observation_space.shape
         n_actions = self.env.action_space.n
 
-        self.net = DQN(obs_size, n_actions)
-        self.target_net = DQN(obs_size, n_actions)
+        self.net = MarioNet(obs_size, n_actions)
+        self.target_net = MarioNet(obs_size, n_actions)
 
         self.buffer = ReplayBuffer(self.hparams.replay_size)
         self.agent = Agent(self.env, self.buffer)
@@ -394,19 +417,19 @@ class DQNLightning(LightningModule):
 
 
 def main():
-    env = gym_super_mario_bros.make("SuperMarioBros-1-1-v0", render_mode='rgb', apply_api_compatibility=True)
+    model = DQNLightning(render_mode="human")
 
-    env = JoypadSpace(env, [["right"], ["right", "A"]])
+    trainer = Trainer(
+        accelerator="auto",
+        devices=1 if torch.cuda.is_available() else None,  # limiting got iPython runs
+        max_epochs=1000,
+        val_check_interval=50,
+        logger=CSVLogger(save_dir="logs/"),
+    )
 
-    env.reset()
-    next_state, reward, done, trunc, info = env.step(action=0)
-    print(f"{next_state.shape},\n {reward},\n {done},\n {info}")
+    trainer.fit(model)
 
-    # Apply Wrappers to environment
-    env = SkipFrame(env, skip=4)
-    env = GrayScaleObservation(env)
-    env = ResizeObservation(env, shape=84)
-    env = FrameStack(env, num_stack=4)
+    model.env.close()
 
 if __name__ == "__main__":
     main()
